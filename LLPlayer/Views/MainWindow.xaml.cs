@@ -1,8 +1,10 @@
 ﻿using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using FlyleafLib.Controls.WPF;
+using FlyleafLib.MediaPlayer;
 using LLPlayer.Services;
 using LLPlayer.ViewModels;
 
@@ -30,7 +32,20 @@ public partial class MainWindow : Window
                 host.IsFullScreen = false;
                 e.Handled = true;
             }
+            RouteIdleKey(e, keyUp: false);
         };
+        PreviewKeyUp += (_, e) => RouteIdleKey(e, keyUp: true);
+    }
+
+    private void RouteIdleKey(KeyEventArgs e, bool keyUp)
+    {
+        var player = ((MainWindowVM)DataContext).FL.Player;
+        // At startup focus can remain on the owner instead of the video surface.
+        // Keep text fields and other focused controls responsible for their own keys.
+        if (e.Handled || player.CanPlay || player.IsOpening
+            || e.OriginalSource is Control and not Window)
+            return;
+        e.Handled = keyUp ? Player.KeyUp(player, e) : Player.KeyDown(player, e);
     }
 
     private void SetWindowSize()

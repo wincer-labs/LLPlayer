@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Threading;
+using System.Windows.Input;
 using FlyleafLib.MediaPlayer;
 using LLPlayer.Services;
 
@@ -43,7 +44,8 @@ internal static class PlaybackIntegrationScenarios
                 Assert.True(playback.HasHistory);
                 Pump();
                 Assert.False(player.CanPlay); // Remains idle until Play.
-                player.TogglePlayPause();
+                Assert.True(Player.KeyDown(player, Key.Space));
+                Assert.True(Player.KeyUp(player, Key.Space));
                 player.TogglePlayPause(); // Repeated requests cannot enqueue another restore.
                 PumpUntil(() => player.CanPlay && player.IsPlaying && player.CurTime >= TimeSpan.FromSeconds(5).Ticks);
                 player.Pause();
