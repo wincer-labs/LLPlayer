@@ -352,7 +352,7 @@ public class AppActions
 
     public DelegateCommand CmdActivateSubsSearch => field ??= new(() =>
     {
-        if (_flyleafHost is { IsFullScreen: true })
+        if (_flyleafHost is { IsFullScreen: true, IsOwnerFullScreen: false })
         {
             return;
         }

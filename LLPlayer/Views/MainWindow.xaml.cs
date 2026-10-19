@@ -20,6 +20,17 @@ public partial class MainWindow : Window
 
         SetWindowSize();
         SetTitleBarDarkMode(this);
+
+        PreviewKeyDown += (_, e) =>
+        {
+            var fl = ((MainWindowVM)DataContext).FL;
+            if (e.Key == Key.Escape && fl.FlyleafHost is { IsOwnerFullScreen: true } host
+                && !fl.Config.SidebarSearchActive)
+            {
+                host.IsFullScreen = false;
+                e.Handled = true;
+            }
+        };
     }
 
     private void SetWindowSize()

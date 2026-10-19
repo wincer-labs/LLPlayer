@@ -63,6 +63,18 @@
                         </ComboBox>
                     </StackPanel>
                     <TextBlock Text="Please configure the settings in advance in the Translate tab." />
+                    <CheckBox
+                        IsChecked="{Binding FL.Config.Subs.WordTranslationUseContext}"
+                        Content="Use subtitle context for word translation (LLM)" />
+                    <StackPanel Orientation="Horizontal"
+                                IsEnabled="{Binding FL.Config.Subs.WordTranslationUseContext}">
+                        <TextBlock VerticalAlignment="Center" Text="Subtitles before and after (0–10):" Margin="0 0 10 0" />
+                        <TextBox Width="60"
+                                 Text="{Binding FL.Config.Subs.WordTranslationContextCount}"
+                                 helpers:TextBoxHelper.OnlyNumeric="Uint" />
+                    </StackPanel>
+                    <TextBlock Text="The current sentence is always included when context is enabled."
+                               TextWrapping="Wrap" />
                 </StackPanel>
             </GroupBox>
 

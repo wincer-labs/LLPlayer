@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -94,6 +95,9 @@ public partial class WordPopup : UserControl, INotifyPropertyChanged
 
     private void SubsOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(AppConfigSubs.WordTranslationUseContext) or nameof(AppConfigSubs.WordTranslationContextCount))
+            _translateCache.Clear();
+
         if (e.PropertyName == nameof(AppConfigSubs.WordMenuActions))
         {
             // Apply word action settings changes
@@ -201,8 +205,18 @@ public partial class WordPopup : UserControl, INotifyPropertyChanged
             return text;
         }
 
-        string lower = text.ToLower();
-        if (_translateCache.TryGetValue(lower, out var cache))
+        WordTranslationContext? context = null;
+        if (FL.Config.Subs.WordTranslationUseContext && FL.PlayerConfig.Subtitles.TranslateWordServiceType.IsLLM())
+        {
+            var manager = FL.Player.SubtitlesManager[e.SubIndex];
+            // A sidebar lookup can target any row, independently of playback position.
+            int index = IsSidebar && e.Sender?.DataContext is SubtitleData subtitle
+                ? subtitle.Index : manager.CurrentIndex;
+            context = manager.GetWordTranslationContext(index, e.Text, FL.Config.Subs.WordTranslationContextCount);
+        }
+
+        string cacheKey = JsonSerializer.Serialize(new { Text = text, Source = srcLang.ISO6391, Target = targetLang, Context = context });
+        if (_translateCache.TryGetValue(cacheKey, out var cache))
         {
             return cache;
         }
@@ -226,8 +240,11 @@ public partial class WordPopup : UserControl, INotifyPropertyChanged
 
         try
         {
-            string result = await _translateService.TranslateAsync(text, token);
-            _translateCache.TryAdd(lower, result);
+            _translateService.Initialize(srcLang, targetLang);
+            string result = context != null && _translateService is OpenAIBaseTranslateService llm
+                ? await llm.TranslateWordAsync(text, context, token)
+                : await _translateService.TranslateAsync(text, token);
+            _translateCache.TryAdd(cacheKey, result);
 
             return result;
         }

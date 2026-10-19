@@ -90,6 +90,7 @@
             SurfaceCreated="FlyleafHost_SurfaceCreated"
             OverlayCreated="FlyleafHost_OverlayCreated"
             Player="{Binding FL.Player}"
+            FullScreenWithOwner="True"
             KeyBindings="Both"
             PanRotateOnShiftWheel="None"
             PanZoomOnCtrlWheel="None"

@@ -829,6 +829,12 @@ public class AppConfigSubs : Bindable
     }
 
     public WordClickAction WordClickActionMethod { get; set => Set(ref field, value); }
+    public bool WordTranslationUseContext { get; set => Set(ref field, value); } = true;
+    public int WordTranslationContextCount
+    {
+        get;
+        set => Set(ref field, Math.Clamp(value, 0, 10));
+    } = 3;
     public bool WordCopyOnSelected { get; set => Set(ref field, value); } = true;
     public bool WordLastSearchOnSelected { get; set => Set(ref field, value); } = true;
 

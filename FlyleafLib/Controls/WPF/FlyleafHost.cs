@@ -136,6 +136,16 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
     public int          ResizeSensitivity   { get; set; } = 6;
     public double       CurResizeRatio      => curResizeRatio;
 
+    /// <summary>Keep the host and its sibling controls together in an attached owner's fullscreen window.</summary>
+    public bool FullScreenWithOwner { get; set; }
+    public bool IsOwnerFullScreen => ownerFullScreen;
+
+    bool ownerFullScreen;
+    WindowStyle ownerWindowStyle;
+    ResizeMode ownerResizeMode;
+    WindowState ownerWindowState;
+    Rect ownerRestoreBounds;
+
     static bool         isDesignMode;
     static int          idGenerator = 1;
     static WindowStyles NONE_STYLE      = WindowStyles.WS_MINIMIZEBOX | WindowStyles.WS_CLIPSIBLINGS | WindowStyles.WS_CLIPCHILDREN | WindowStyles.WS_VISIBLE; // WS_MINIMIZEBOX required for swapchain
@@ -644,7 +654,9 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         if (host.Disposed)
             return;
 
-        if (host.Surface != null)
+        if (host.ownerFullScreen)
+            host.Owner.WindowState = host.IsMinimized ? WindowState.Minimized : WindowState.Normal;
+        else if (host.Surface != null)
             host.Surface.WindowState = host.IsMinimized ? WindowState.Minimized : (host.IsFullScreen ? WindowState.Maximized : WindowState.Normal);
     }
     private static void OnIsAttachedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -923,7 +935,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         // TBR: Option not to clip rect or stop at first/second parent?
         // For performance should focus only on ScrollViewer if any and Owner Window (other sources that clip our host?)
 
-        if (!IsVisible || !_IsAttached || _IsFullScreen)
+        if (!IsVisible || !_IsAttached || (_IsFullScreen && !ownerFullScreen))
             return;
 
         try
@@ -1962,6 +1974,56 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
 
     public void RefreshNormalFullScreen()
     {
+        if (_IsFullScreen && FullScreenWithOwner && _IsAttached && Owner != null && !IsStandAlone)
+        {
+            if (!ownerFullScreen)
+            {
+                ownerWindowStyle = Owner.WindowStyle;
+                ownerResizeMode = Owner.ResizeMode;
+                ownerWindowState = Owner.WindowState;
+                ownerRestoreBounds = Owner.RestoreBounds;
+                var monitorBounds = System.Windows.Forms.Screen.FromHandle(OwnerHandle).Bounds;
+
+                // Keep the video surface attached: WPF can continue laying it out beside the sidebar.
+                ownerFullScreen = true;
+                Owner.WindowState = WindowState.Normal;
+                Owner.WindowStyle = WindowStyle.None;
+                Owner.ResizeMode = ResizeMode.NoResize;
+                SetWindowPos(OwnerHandle, IntPtr.Zero, monitorBounds.Left, monitorBounds.Top,
+                    monitorBounds.Width, monitorBounds.Height,
+                    (uint)(SetWindowPosFlags.SWP_NOZORDER | SetWindowPosFlags.SWP_NOACTIVATE));
+                Owner.UpdateLayout();
+                rectInitLast = rectIntersectLast = Rect.Empty;
+                Host_LayoutUpdated(null, null);
+                if (Player != null)
+                    Player.Config.Video.CornerRadius = CornerRadiusEmpty;
+                Player?.Activity.RefreshFullActive();
+            }
+            return;
+        }
+
+        if (ownerFullScreen)
+        {
+            ownerFullScreen = false;
+            Owner.WindowState = WindowState.Normal;
+            Owner.WindowStyle = ownerWindowStyle;
+            Owner.ResizeMode = ownerResizeMode;
+            if (!ownerRestoreBounds.IsEmpty)
+            {
+                Owner.Left = ownerRestoreBounds.Left;
+                Owner.Top = ownerRestoreBounds.Top;
+                Owner.Width = ownerRestoreBounds.Width;
+                Owner.Height = ownerRestoreBounds.Height;
+            }
+            Owner.WindowState = ownerWindowState;
+            Owner.UpdateLayout();
+            rectInitLast = rectIntersectLast = Rect.Empty;
+            Host_LayoutUpdated(null, null);
+            if (Player != null)
+                Player.Config.Video.CornerRadius = CornerRadius;
+            return;
+        }
+
         if (_IsFullScreen)
         {
             ratioBeforeFullScreen = curResizeRatio;

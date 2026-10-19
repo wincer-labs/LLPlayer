@@ -121,6 +121,12 @@ public class SubManager : INotifyPropertyChanged
     public int Height { get; internal set; }
 
     private readonly object _subsLocker = new();
+
+    public Translation.WordTranslationContext GetWordTranslationContext(int index, string sentence, int surroundingCount)
+    {
+        lock (_subsLocker)
+            return Translation.WordTranslationContext.Create(Subs, index, sentence, surroundingCount);
+    }
     private readonly Config _config;
     private readonly int _subIndex;
     private readonly SubTranslator _subTranslator;
