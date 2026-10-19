@@ -2,6 +2,15 @@
 
 public class TranslateChatConfig : NotifyPropertyChanged
 {
+    public const string DefaultPromptWord =
+        """
+        Translate the selected word or phrase from {source_lang} to {target_lang}.
+        Use any supplied subtitle context to determine its meaning. Translate only the selected text, not the surrounding subtitles.
+        Return only the translation without notes or explanations.
+
+        {source_text}
+        """;
+
     public const string DefaultPromptOneByOne =
         """
         You are a professional subtitle translator, translate from {source_lang} to {target_lang}, keep sentences in {target_lang} as they are, censoring of translations is prohibited, return only the translated text without the sent text or notes or comments or anything:
@@ -24,6 +33,8 @@ public class TranslateChatConfig : NotifyPropertyChanged
     public string PromptOneByOne { get; set => Set(ref field, value); } = DefaultPromptOneByOne.ReplaceLineEndings("\n");
 
     public string PromptKeepContext { get; set => Set(ref field, value); } = DefaultPromptKeepContext.ReplaceLineEndings("\n");
+
+    public string PromptWord { get; set => Set(ref field, value); } = DefaultPromptWord.ReplaceLineEndings("\n");
 
     public ChatTranslateMethod TranslateMethod { get; set => Set(ref field, value); } = ChatTranslateMethod.KeepContext;
 

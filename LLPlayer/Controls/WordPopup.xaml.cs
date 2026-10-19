@@ -215,7 +215,9 @@ public partial class WordPopup : UserControl, INotifyPropertyChanged
             context = manager.GetWordTranslationContext(index, e.Text, FL.Config.Subs.WordTranslationContextCount);
         }
 
-        string cacheKey = JsonSerializer.Serialize(new { Text = text, Source = srcLang.ISO6391, Target = targetLang, Context = context });
+        string? wordPrompt = FL.PlayerConfig.Subtitles.TranslateWordServiceType.IsLLM()
+            ? FL.PlayerConfig.Subtitles.TranslateChatConfig.PromptWord : null;
+        string cacheKey = JsonSerializer.Serialize(new { Text = text, Source = srcLang.ISO6391, Target = targetLang, Context = context, Prompt = wordPrompt });
         if (_translateCache.TryGetValue(cacheKey, out var cache))
         {
             return cache;

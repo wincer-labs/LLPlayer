@@ -105,6 +105,9 @@ public class SubTranslator
 
     private void TranslateChatConfig_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(TranslateChatConfig.PromptWord))
+            return;
+
         _ = Reset();
     }
 

@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using FlyleafLib.MediaPlayer.Translation;
 using FlyleafLib.MediaPlayer.Translation.Services;
 using LLPlayer.Extensions;
 using LLPlayer.Services;
@@ -56,6 +57,11 @@ public class SettingsSubtitlesActionVM : Bindable
     }
 
     public List<WordClickAction> WordClickActions { get; }
+
+    public DelegateCommand CmdSetDefaultPromptWord => field ??= new(() =>
+    {
+        FL.PlayerConfig.Subtitles.TranslateChatConfig.PromptWord = TranslateChatConfig.DefaultPromptWord.ReplaceLineEndings("\n");
+    });
 
     public List<ModifierKeys> ModifierKeys { get; } =
     [

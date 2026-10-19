@@ -75,6 +75,30 @@
                     </StackPanel>
                     <TextBlock Text="The current sentence is always included when context is enabled."
                                TextWrapping="Wrap" />
+                    <TextBlock Text="Word Translation Prompt (LLM)" FontWeight="Medium" Margin="0 12 0 6" />
+                    <TextBlock Text="Applies only to word lookups, with or without subtitle context. Subtitle translation prompts are configured separately in the Translate tab."
+                               TextWrapping="Wrap" Margin="0 0 0 6" />
+                    <TextBox
+                        x:Name="WordTranslationPrompt"
+                        AutomationProperties.Name="Word Translation Prompt"
+                        BorderThickness="1"
+                        Padding="10"
+                        HorizontalContentAlignment="Left"
+                        TextAlignment="Left"
+                        VerticalContentAlignment="Top"
+                        AcceptsReturn="True"
+                        MinHeight="120"
+                        MaxHeight="300"
+                        VerticalScrollBarVisibility="Auto"
+                        TextWrapping="Wrap"
+                        Text="{Binding FL.PlayerConfig.Subtitles.TranslateChatConfig.PromptWord, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="{}{source_lang}: source language; {target_lang}: target language; {source_text}: selected word or phrase. Subtitle context is attached automatically when enabled. A blank prompt uses the default."
+                               TextWrapping="Wrap" Margin="0 6 0 0" />
+                    <Button
+                        Command="{Binding CmdSetDefaultPromptWord}"
+                        HorizontalAlignment="Left"
+                        Content="Set Default"
+                        Margin="0 10 0 0" />
                 </StackPanel>
             </GroupBox>
 
