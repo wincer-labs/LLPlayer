@@ -238,12 +238,12 @@ Right Click: Open Context Menu</ToolTip>
                     </TextBlock>
                 </StackPanel>
 
-                <Button Grid.Column="5" Content="{materialDesign:PackIcon Kind=SkipPrevious}" Command="{Binding FL.Player.Commands.Reopen}" CommandParameter="{Binding FL.Player.Playlist.PrevItem}" ToolTip="Previous Playlist Item">
+                <Button Grid.Column="5" Content="{materialDesign:PackIcon Kind=SkipPrevious}" Command="{Binding FL.Playback.CmdOpenItem}" CommandParameter="{Binding FL.Playback.PreviousItem}" ToolTip="Previous Playlist Item">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
                             <Setter Property="Visibility" Value="Visible"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding FL.Player.Playlist.PrevItem}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding FL.Playback.PreviousItem}" Value="{x:Null}">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>
@@ -251,12 +251,12 @@ Right Click: Open Context Menu</ToolTip>
                     </Button.Style>
                 </Button>
 
-                <Button Grid.Column="6" Content="{materialDesign:PackIcon Kind=SkipNext}" Command="{Binding FL.Player.Commands.Reopen}" CommandParameter="{Binding FL.Player.Playlist.NextItem}" ToolTip="Next Playlist Item">
+                <Button Grid.Column="6" Content="{materialDesign:PackIcon Kind=SkipNext}" Command="{Binding FL.Playback.CmdOpenItem}" CommandParameter="{Binding FL.Playback.NextItem}" ToolTip="Next Playlist Item">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
                             <Setter Property="Visibility" Value="Visible"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding FL.Player.Playlist.NextItem}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding FL.Playback.NextItem}" Value="{x:Null}">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>

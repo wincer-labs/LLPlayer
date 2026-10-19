@@ -21,13 +21,15 @@ public class AppActions
     private readonly AppConfig _config;
     private FlyleafHost? _flyleafHost => _player.Host as FlyleafHost;
     private readonly IDialogService _dialogService;
+    private readonly PlaybackController _playback;
 
 #pragma warning disable CS9264
-    public AppActions(Player player, AppConfig config, IDialogService dialogService)
+    public AppActions(Player player, AppConfig config, IDialogService dialogService, PlaybackController playback)
     {
         _player = player;
         _config = config;
         _dialogService = dialogService;
+        _playback = playback;
 
         CustomActions = GetCustomActions();
 
@@ -135,28 +137,7 @@ public class AppActions
 
     private void OpenNextPrevInternal(bool isNext)
     {
-        var playlist = _player.Playlist;
-        if (playlist.Url == null)
-            return;
-
-        string url = playlist.Url;
-
-        try
-        {
-            (string? prev, string? next) = FileHelper.GetNextAndPreviousFile(url);
-            if (isNext && next != null)
-            {
-                _player.OpenAsync(next);
-            }
-            else if (!isNext && prev != null)
-            {
-                _player.OpenAsync(prev);
-            }
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"OpenNextPrevFile is failed: {ex.Message}");
-        }
+        _playback.OpenAdjacent(isNext);
     }
 
     public DelegateCommand CmdOpenCurrentPath => field ??= new(() =>

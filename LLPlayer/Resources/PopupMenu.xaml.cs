@@ -21,6 +21,7 @@ public partial class PopupMenu : ResourceDictionary
         if (sender is ContextMenu menu && menu.DataContext is FlyleafOverlayVM vm)
         {
             vm.FL.Player.Activity.IsEnabled = false;
+            _ = vm.FL.Playback.RefreshDirectoryAsync();
         }
     }
 

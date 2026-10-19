@@ -29,17 +29,37 @@ partial class Player
     public event EventHandler<int> SeekCompleted;
 
     /// <summary>
+    /// Allows the host to open media when Play is requested while idle.
+    /// Not raised while an asynchronous open is pending or after disposal.
+    /// </summary>
+    public event EventHandler PlayRequestedWithoutMedia;
+
+    /// <summary>
     /// Plays AVS streams
     /// </summary>
     public void Play()
     {
+        bool requestMedia;
         lock (lockActions)
         {
-            if (!canPlay || status == Status.Playing || status == Status.Ended)
+            if (IsDisposed || status == Status.Playing || status == Status.Ended)
                 return;
 
-            status = Status.Playing;
-            UI(() => Status = status);
+            requestMedia = !canPlay;
+            if (requestMedia && (status == Status.Opening || taskOpenAsyncRuns))
+                return;
+            if (!requestMedia)
+            {
+                status = Status.Playing;
+                UI(() => Status = status);
+            }
+        }
+
+        // Host callbacks must run outside lockActions (they may open media).
+        if (requestMedia)
+        {
+            PlayRequestedWithoutMedia?.Invoke(this, EventArgs.Empty);
+            return;
         }
 
         while (taskPlayRuns || taskSeekRuns) Thread.Sleep(5);

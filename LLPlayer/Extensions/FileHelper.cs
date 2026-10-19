@@ -5,9 +5,27 @@ namespace LLPlayer.Extensions;
 
 public static class FileHelper
 {
+    private static readonly HashSet<string> MediaExtensions = new(
+        ExtensionsVideo.Concat(ExtensionsAudio), StringComparer.OrdinalIgnoreCase);
+
+    public static bool IsLocalMedia(string? path) => !string.IsNullOrWhiteSpace(path)
+        && Path.IsPathFullyQualified(path) && MediaExtensions.Contains(Path.GetExtension(path).TrimStart('.'));
+
+    /// <summary>Audio and video in this directory only, in natural filename order.</summary>
+    public static List<string> GetDirectoryMedia(string filePath)
+    {
+        string directory = Path.GetDirectoryName(filePath)
+            ?? throw new ArgumentException("A full file path is required", nameof(filePath));
+        return Directory.EnumerateFiles(directory)
+            .Where(IsLocalMedia)
+            .OrderBy(Path.GetFileName, new NaturalStringComparer())
+            .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     /// <summary>
     /// Retrieves the next and previous file from the specified file path.
-    /// Select files with the same extension in the same folder, sorted in natural alphabetical order.
+    /// Select audio/video files in the same folder, sorted in natural alphabetical order.
     /// Returns null if the next or previous file does not exist.
     /// </summary>
     /// <param name="filePath"></param>
@@ -22,24 +40,7 @@ public static class FileHelper
             throw new FileNotFoundException("file does not exist", filePath);
         }
 
-        string? directory = Path.GetDirectoryName(filePath);
-        string? extension = Path.GetExtension(filePath);
-
-        if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(extension))
-        {
-            throw new InvalidOperationException($"filePath is invalid: {filePath}");
-        }
-
-        // Get files with the same extension, ignoring case
-        List<string> foundFiles = Directory.GetFiles(directory, $"*{extension}")
-                                  .Where(f => string.Equals(Path.GetExtension(f), extension, StringComparison.OrdinalIgnoreCase))
-                                  .OrderBy(f => Path.GetFileName(f), new NaturalStringComparer())
-                                  .ToList();
-
-        if (foundFiles.Count == 0)
-        {
-            throw new InvalidOperationException($"same extension file does not exist: {filePath}");
-        }
+        List<string> foundFiles = GetDirectoryMedia(filePath);
 
         int currentIndex = foundFiles.FindIndex(f => string.Equals(f, filePath, StringComparison.OrdinalIgnoreCase));
         if (currentIndex == -1)

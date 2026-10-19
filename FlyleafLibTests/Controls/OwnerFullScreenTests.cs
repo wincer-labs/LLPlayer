@@ -23,6 +23,7 @@ public class OwnerFullScreenTests
             try
             {
                 Utils.IsTesting = false;
+                Utils.SaveOriginalCulture();
                 var root = new DirectoryInfo(AppContext.BaseDirectory);
                 while (root != null && !File.Exists(Path.Combine(root.FullName, "LLPlayer.slnx")))
                     root = root.Parent;
@@ -31,6 +32,7 @@ public class OwnerFullScreenTests
                 Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 RunScenario(false);
                 RunScenario(true);
+                Playback.PlaybackIntegrationScenarios.Run();
             }
             catch (Exception error) { failure = error; }
             finally
@@ -42,7 +44,7 @@ public class OwnerFullScreenTests
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "Fullscreen test timed out");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(60)), "Desktop playback/fullscreen test timed out");
         if (failure != null)
             ExceptionDispatchInfo.Capture(failure).Throw();
     }

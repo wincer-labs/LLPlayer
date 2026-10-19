@@ -13,6 +13,7 @@ public class FlyleafManager
     public FlyleafHost? FlyleafHost => Player.Host as FlyleafHost;
     public AppConfig Config { get; }
     public AppActions Action { get; }
+    public PlaybackController Playback { get; }
 
     public AudioEngine AudioEngine => Engine.Audio;
     public EngineConfig ConfigEngine => Engine.Config;
@@ -23,7 +24,9 @@ public class FlyleafManager
 
         // Load app configuration at this time
         Config = LoadAppConfig();
-        Action = new AppActions(Player, Config, dialogService);
+        Playback = new PlaybackController(Player, new PlaybackStateStore(
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LLPlayer.Playback.json")));
+        Action = new AppActions(Player, Config, dialogService, Playback);
     }
 
     private AppConfig LoadAppConfig()

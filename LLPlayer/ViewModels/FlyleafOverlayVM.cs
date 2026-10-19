@@ -221,7 +221,7 @@ public class FlyleafOverlayVM : Bindable
     private void SingleClickAction()
     {
         // Toggle play/pause on left click
-        if (FL.Config.MouseSingleClickToPlay && FL.Player.CanPlay)
+        if (FL.Config.MouseSingleClickToPlay)
             FL.Player.TogglePlayPause();
     }
 

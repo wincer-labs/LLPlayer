@@ -56,6 +56,7 @@ public class MainWindowVM : Bindable
 
     public DelegateCommand CmdOnLoaded => field ??= new(() =>
     {
+        PlayPauseVisibility = FL.Playback.HasHistory ? Visibility.Visible : Visibility.Collapsed;
         // error handling
         FL.Player.KnownErrorOccurred += (sender, args) =>
         {
@@ -174,6 +175,7 @@ public class MainWindowVM : Bindable
 
     public DelegateCommand CmdOnClosing => field ??= new(() =>
     {
+        FL.Playback.Dispose();
         FL.Player.Dispose();
     });
 }
