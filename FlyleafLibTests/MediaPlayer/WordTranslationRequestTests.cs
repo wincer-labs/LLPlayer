@@ -10,6 +10,71 @@ namespace FlyleafLib.MediaPlayer;
 
 public class WordTranslationRequestTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WordLookupMetadataCarriesExplicitUnicodeTermAndOptionalContext(bool includeContext)
+    {
+        const string term = "take off 起飞";
+        var request = await CaptureRequest(new TranslateChatConfig { PromptWord = "Explain briefly." },
+            context: includeContext ? Context : null, term: term);
+        Assert.NotNull(request.LookupMetadata);
+        using var payload = JsonDocument.Parse(Convert.FromBase64String(request.LookupMetadata));
+        var metadata = payload.RootElement;
+        Assert.Equal(1, metadata.GetProperty("version").GetInt32());
+        Assert.Equal("word_action", metadata.GetProperty("kind").GetString());
+        Assert.True(Guid.TryParse(metadata.GetProperty("lookup_id").GetString(), out _));
+        Assert.Equal(term, metadata.GetProperty("term").GetString());
+        Assert.Equal(TimeSpan.Zero, metadata.GetProperty("looked_up_at").GetDateTimeOffset().Offset);
+        Assert.Equal("LLPlayer", metadata.GetProperty("source").GetProperty("application").GetString());
+        var context = metadata.GetProperty("context");
+        Assert.Equal(includeContext ? Context.Sentence : "", context.GetProperty("sentence").GetString());
+        Assert.Equal(includeContext ? Context.Previous : [],
+            context.GetProperty("previous").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(includeContext ? Context.Following : [],
+            context.GetProperty("following").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.DoesNotContain("lookup_id", request.Body);
+        Assert.DoesNotContain("word_action", request.Body);
+    }
+
+    [Fact]
+    public async Task WordLookupMetadataCanBeDisabledAndHelloNeverIncludesIt()
+    {
+        var disabled = await CaptureRequest(new TranslateChatConfig { SendWordLookupMetadata = false });
+        Assert.Null(disabled.LookupMetadata);
+        var hello = await CaptureRequest(new TranslateChatConfig(), hello: true);
+        Assert.Null(hello.LookupMetadata);
+    }
+
+    [Fact]
+    public async Task EachActualWordLookupHasItsOwnIdentifier()
+    {
+        var first = await CaptureRequest(new TranslateChatConfig());
+        var second = await CaptureRequest(new TranslateChatConfig());
+        using var firstMetadata = JsonDocument.Parse(Convert.FromBase64String(first.LookupMetadata!));
+        using var secondMetadata = JsonDocument.Parse(Convert.FromBase64String(second.LookupMetadata!));
+        Assert.NotEqual(firstMetadata.RootElement.GetProperty("lookup_id").GetString(),
+            secondMetadata.RootElement.GetProperty("lookup_id").GetString());
+    }
+
+    [Fact]
+    public async Task LocalWordLookupDoesNotFollowRedirectsWithItsMetadata()
+    {
+        using TcpListener listener = new(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(15));
+        var receive = ReplyAndCapture(listener, timeout.Token, redirect: true);
+        using OpenAIBaseTranslateService service = new(new OllamaTranslateSettings
+        {
+            Endpoint = $"http://127.0.0.1:{port}", Model = "test-model"
+        }, new TranslateChatConfig(), true);
+        service.Initialize(Language.English, TargetLanguage.ChineseSimplified);
+        var error = await Assert.ThrowsAsync<TranslationException>(() => service.TranslateAsync("bank", timeout.Token));
+        Assert.Equal("307", error.Data["status_code"]);
+        Assert.NotNull((await receive).LookupMetadata);
+    }
+
     [Fact]
     public async Task SendsContextAndOnlyRequestsSelectedTextWithoutHistory()
     {
@@ -104,10 +169,13 @@ public class WordTranslationRequestTests
     public void WordPromptPersistsIndependentlyAndOlderConfigGetsDefault()
     {
         var oldConfig = JsonSerializer.Deserialize<TranslateChatConfig>("""{"PromptOneByOne":"Custom subtitle prompt"}""")!;
+        Assert.True(oldConfig.SendWordLookupMetadata);
         Assert.Equal(TranslateChatConfig.DefaultPromptWord.ReplaceLineEndings("\n"), oldConfig.PromptWord);
         oldConfig.PromptWord = "Explain {source_text} in {target_lang}.\nGive an example.";
+        oldConfig.SendWordLookupMetadata = false;
         var restored = JsonSerializer.Deserialize<TranslateChatConfig>(JsonSerializer.Serialize(oldConfig))!;
         Assert.Equal(oldConfig.PromptWord, restored.PromptWord);
+        Assert.False(restored.SendWordLookupMetadata);
         Assert.Equal("Custom subtitle prompt", restored.PromptOneByOne);
     }
 
@@ -116,27 +184,40 @@ public class WordTranslationRequestTests
     private static async Task<JsonElement> CaptureMessages(TranslateChatConfig config, bool wordMode = true,
         WordTranslationContext? context = null)
     {
+        var request = await CaptureRequest(config, wordMode, context);
+        using var payload = JsonDocument.Parse(request.Body);
+        return payload.RootElement.GetProperty("messages").Clone();
+    }
+
+    private static async Task<CapturedRequest> CaptureRequest(TranslateChatConfig config, bool wordMode = true,
+        WordTranslationContext? context = null, string term = "bank", bool hello = false)
+    {
         using TcpListener listener = new(IPAddress.Loopback, 0);
         listener.Start();
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
         using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(15));
         var receive = ReplyAndCapture(listener, timeout.Token);
-        using OpenAIBaseTranslateService service = new(new OllamaTranslateSettings
+        var settings = new OllamaTranslateSettings
         {
             Endpoint = $"http://127.0.0.1:{port}", Model = "test-model"
-        }, config, wordMode);
+        };
+        using OpenAIBaseTranslateService service = new(settings, config, wordMode);
         service.Initialize(Language.English, TargetLanguage.ChineseSimplified);
-        var translating = context != null
-            ? service.TranslateWordAsync("bank", context, timeout.Token)
-            : service.TranslateAsync("bank", timeout.Token);
+        var translating = hello ? OpenAIBaseTranslateService.Hello(settings) : context != null
+            ? service.TranslateWordAsync(term, context, timeout.Token)
+            : service.TranslateAsync(term, timeout.Token);
         Assert.Equal("河岸", await translating);
-        var (path, body) = await receive;
-        using var payload = JsonDocument.Parse(body);
-        Assert.Equal("/v1/chat/completions", path);
-        return payload.RootElement.GetProperty("messages").Clone();
+        var captured = await receive;
+        Assert.Equal("/v1/chat/completions", captured.Path);
+        if (!wordMode || hello)
+            Assert.Null(captured.LookupMetadata);
+        return captured;
     }
 
-    private static async Task<(string Path, string Body)> ReplyAndCapture(TcpListener listener, CancellationToken token)
+    private sealed record CapturedRequest(string Path, string Body, string? LookupMetadata);
+
+    private static async Task<CapturedRequest> ReplyAndCapture(TcpListener listener, CancellationToken token,
+        bool redirect = false)
     {
         using var client = await listener.AcceptTcpClientAsync(token);
         await using var stream = client.GetStream();
@@ -154,8 +235,12 @@ public class WordTranslationRequestTests
         byte[] body = new byte[length];
         await stream.ReadExactlyAsync(body, token);
         byte[] response = Encoding.UTF8.GetBytes("""{"choices":[{"message":{"role":"assistant","content":"河岸"}}]}""");
-        await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {response.Length}\r\nConnection: close\r\n\r\n"), token);
+        string status = redirect ? "307 Temporary Redirect" : "200 OK";
+        string location = redirect ? "Location: /must-not-receive-metadata\r\n" : "";
+        await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\n{location}Content-Type: application/json\r\nContent-Length: {response.Length}\r\nConnection: close\r\n\r\n"), token);
         await stream.WriteAsync(response, token);
-        return (lines[0].Split(' ')[1], Encoding.UTF8.GetString(body));
+        string? lookupMetadata = lines.FirstOrDefault(l => l.StartsWith("X-LLPlayer-Lookup:", StringComparison.OrdinalIgnoreCase))?
+            .Split(':', 2)[1].Trim();
+        return new(lines[0].Split(' ')[1], Encoding.UTF8.GetString(body), lookupMetadata);
     }
 }

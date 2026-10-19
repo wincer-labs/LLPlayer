@@ -75,6 +75,11 @@
                     </StackPanel>
                     <TextBlock Text="The current sentence is always included when context is enabled."
                                TextWrapping="Wrap" />
+                    <CheckBox
+                        IsChecked="{Binding FL.PlayerConfig.Subtitles.TranslateChatConfig.SendWordLookupMetadata}"
+                        Content="Send word lookup metadata to local LLM services" />
+                    <TextBlock Text="Includes the selected word or phrase and enabled subtitle context for local integrations such as Lexitrace. Only loopback API addresses receive this metadata."
+                               TextWrapping="Wrap" />
                     <TextBlock Text="Word Translation Prompt (LLM)" FontWeight="Medium" Margin="0 12 0 6" />
                     <TextBlock Text="Applies only to word lookups, with or without subtitle context. Subtitle translation prompts are configured separately in the Translate tab."
                                TextWrapping="Wrap" Margin="0 0 0 6" />

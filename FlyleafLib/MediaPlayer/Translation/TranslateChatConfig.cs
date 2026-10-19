@@ -36,6 +36,8 @@ public class TranslateChatConfig : NotifyPropertyChanged
 
     public string PromptWord { get; set => Set(ref field, value); } = DefaultPromptWord.ReplaceLineEndings("\n");
 
+    public bool SendWordLookupMetadata { get; set => Set(ref field, value); } = true;
+
     public ChatTranslateMethod TranslateMethod { get; set => Set(ref field, value); } = ChatTranslateMethod.KeepContext;
 
     public int SubtitleContextCount { get; set => Set(ref field, value); } = 6;

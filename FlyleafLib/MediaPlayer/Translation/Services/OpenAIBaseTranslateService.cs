@@ -23,7 +23,11 @@ public class OpenAIBaseTranslateService : ITranslateService
 
     public OpenAIBaseTranslateService(OpenAIBaseTranslateSettings settings, TranslateChatConfig chatConfig, bool wordMode)
     {
-        _httpClient = settings.GetHttpClient();
+        bool localWordRequest = wordMode &&
+            Uri.TryCreate(settings.Endpoint, UriKind.Absolute, out var endpoint) &&
+            Uri.TryCreate(endpoint, settings.ChatPath, out var requestUri) && requestUri.IsLoopback;
+        // A local integration header must never follow a redirect to a remote provider.
+        _httpClient = settings.GetHttpClient(allowAutoRedirect: !localWordRequest);
         _settings = settings;
         _chatConfig = chatConfig;
         _wordMode = wordMode;
@@ -145,9 +149,26 @@ public class OpenAIBaseTranslateService : ITranslateService
         string prompt = _basePrompt.Contains("{source_text}", StringComparison.Ordinal)
             ? _basePrompt.Replace("{source_text}", text)
             : _basePrompt + "\n\nSelected text:\n" + text;
+        string? lookupMetadata = _chatConfig.SendWordLookupMetadata
+            ? Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                version = 1,
+                kind = "word_action",
+                lookup_id = Guid.NewGuid().ToString(),
+                term = text,
+                context = new
+                {
+                    sentence = context?.Sentence ?? string.Empty,
+                    previous = context?.Previous ?? [],
+                    following = context?.Following ?? []
+                },
+                looked_up_at = DateTimeOffset.UtcNow,
+                source = new { application = "LLPlayer" }
+            }, JsonOptions))
+            : null;
         if (context == null)
             return SendChatRequest(_httpClient, _settings,
-                [new() { role = "user", content = prompt }], token);
+                [new() { role = "user", content = prompt }], token, lookupMetadata);
 
         OpenAIMessage[] messages =
         [
@@ -164,7 +185,7 @@ public class OpenAIBaseTranslateService : ITranslateService
                     "\n\nTranslation request:\n" + prompt
             }
         ];
-        return SendChatRequest(_httpClient, _settings, messages, token);
+        return SendChatRequest(_httpClient, _settings, messages, token, lookupMetadata);
     }
 
     public static async Task<string> Hello(OpenAIBaseTranslateSettings settings)
@@ -183,7 +204,8 @@ public class OpenAIBaseTranslateService : ITranslateService
         HttpClient client,
         OpenAIBaseTranslateSettings settings,
         OpenAIMessage[] messages,
-        CancellationToken token)
+        CancellationToken token,
+        string? lookupMetadata = null)
     {
         string jsonResultString = string.Empty;
         int statusCode = -1;
@@ -210,8 +232,14 @@ public class OpenAIBaseTranslateService : ITranslateService
         {
             // Convert to JSON
             string jsonContent = JsonSerializer.Serialize(request, JsonOptions);
-            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-            using var result = await client.PostAsync(settings.ChatPath, content, token);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(client.BaseAddress!, settings.ChatPath))
+            {
+                Content = new StringContent(jsonContent, Encoding.UTF8, "application/json")
+            };
+            // Keep integration metadata out of remote LLM requests and the shared client's headers.
+            if (lookupMetadata != null && httpRequest.RequestUri!.IsLoopback)
+                httpRequest.Headers.Add("X-LLPlayer-Lookup", lookupMetadata);
+            using var result = await client.SendAsync(httpRequest, token);
 
             jsonResultString = await result.Content.ReadAsStringAsync(token);
 

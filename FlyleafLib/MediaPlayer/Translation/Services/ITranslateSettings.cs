@@ -303,7 +303,7 @@ public abstract class OpenAIBaseTranslateSettings : NotifyPropertyChanged, ITran
     /// <param name="healthCheck"></param>
     /// <returns></returns>
     /// <exception cref="TranslationConfigException"></exception>
-    internal virtual HttpClient GetHttpClient(bool healthCheck = false)
+    internal virtual HttpClient GetHttpClient(bool healthCheck = false, bool allowAutoRedirect = true)
     {
         if (string.IsNullOrWhiteSpace(Endpoint))
         {
@@ -323,9 +323,10 @@ public abstract class OpenAIBaseTranslateSettings : NotifyPropertyChanged, ITran
         // In KoboldCpp, if this is not set, even if it is sent with Connection: close,
         // the connection will be reused and an error will occur.
         HttpMessageHandler handler = ReuseConnection ?
-            new HttpClientHandler() :
+            new HttpClientHandler { AllowAutoRedirect = allowAutoRedirect } :
             new SocketsHttpHandler
             {
+                AllowAutoRedirect = allowAutoRedirect,
                 PooledConnectionLifetime = TimeSpan.Zero,
                 PooledConnectionIdleTimeout = TimeSpan.Zero,
             };
@@ -523,7 +524,7 @@ public class OpenAITranslateSettings : OpenAIBaseTranslateSettings
     /// <param name="healthCheck"></param>
     /// <returns></returns>
     /// <exception cref="TranslationConfigException"></exception>
-    internal override HttpClient GetHttpClient(bool healthCheck = false)
+    internal override HttpClient GetHttpClient(bool healthCheck = false, bool allowAutoRedirect = true)
     {
         if (string.IsNullOrWhiteSpace(ApiKey))
         {
@@ -531,7 +532,7 @@ public class OpenAITranslateSettings : OpenAIBaseTranslateSettings
                 $"API Key for {ServiceType} is not configured.");
         }
 
-        HttpClient client = base.GetHttpClient(healthCheck);
+        HttpClient client = base.GetHttpClient(healthCheck, allowAutoRedirect);
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
 
         return client;
@@ -574,9 +575,9 @@ public class OpenAILikeTranslateSettings : OpenAIBaseTranslateSettings
     /// <param name="healthCheck"></param>
     /// <returns></returns>
     /// <exception cref="TranslationConfigException"></exception>
-    internal override HttpClient GetHttpClient(bool healthCheck = false)
+    internal override HttpClient GetHttpClient(bool healthCheck = false, bool allowAutoRedirect = true)
     {
-        HttpClient client = base.GetHttpClient(healthCheck);
+        HttpClient client = base.GetHttpClient(healthCheck, allowAutoRedirect);
 
         // optional ApiKey
         if (!string.IsNullOrWhiteSpace(ApiKey))
@@ -599,7 +600,7 @@ public class ClaudeTranslateSettings : OpenAIBaseTranslateSettings
     [JsonIgnore]
     public override bool ReasonStripRequired => false;
 
-    internal override HttpClient GetHttpClient(bool healthCheck = false)
+    internal override HttpClient GetHttpClient(bool healthCheck = false, bool allowAutoRedirect = true)
     {
         if (string.IsNullOrWhiteSpace(ApiKey))
         {
@@ -607,7 +608,7 @@ public class ClaudeTranslateSettings : OpenAIBaseTranslateSettings
                 $"API Key for {ServiceType} is not configured.");
         }
 
-        HttpClient client = base.GetHttpClient(healthCheck);
+        HttpClient client = base.GetHttpClient(healthCheck, allowAutoRedirect);
         client.DefaultRequestHeaders.Add("x-api-key", ApiKey);
         client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 
