@@ -217,7 +217,16 @@ public partial class WordPopup : UserControl, INotifyPropertyChanged
 
         string? wordPrompt = FL.PlayerConfig.Subtitles.TranslateWordServiceType.IsLLM()
             ? FL.PlayerConfig.Subtitles.TranslateChatConfig.PromptWord : null;
-        string cacheKey = JsonSerializer.Serialize(new { Text = text, Source = srcLang.ISO6391, Target = targetLang, Context = context, Prompt = wordPrompt });
+        long positionMs = IsSidebar && e.Sender?.DataContext is SubtitleData clickedSubtitle
+            ? (long)clickedSubtitle.StartTime.TotalMilliseconds
+            : FL.Player.CurTime / TimeSpan.TicksPerMillisecond;
+        var lookupSource = WordTranslationSource.FromMedia(
+            FL.Player.Playlist.Selected?.DirectUrl ?? FL.Player.Playlist.Url, positionMs);
+        string cacheKey = JsonSerializer.Serialize(new
+        {
+            Text = text, Source = srcLang.ISO6391, Target = targetLang, Context = context, Prompt = wordPrompt,
+            lookupSource.Category, lookupSource.MediaTitle
+        });
         if (_translateCache.TryGetValue(cacheKey, out var cache))
         {
             return cache;
@@ -243,8 +252,8 @@ public partial class WordPopup : UserControl, INotifyPropertyChanged
         try
         {
             _translateService.Initialize(srcLang, targetLang);
-            string result = context != null && _translateService is OpenAIBaseTranslateService llm
-                ? await llm.TranslateWordAsync(text, context, token)
+            string result = _translateService is OpenAIBaseTranslateService llm
+                ? await llm.TranslateWordAsync(text, context, token, lookupSource)
                 : await _translateService.TranslateAsync(text, token);
             _translateCache.TryAdd(cacheKey, result);
 

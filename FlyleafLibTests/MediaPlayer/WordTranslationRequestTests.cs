@@ -76,6 +76,23 @@ public class WordTranslationRequestTests
     }
 
     [Fact]
+    public async Task LookupSourceIsSentEvenWhenSubtitleContextIsDisabled()
+    {
+        var source = WordTranslationSource.FromMedia(@"C:\Private\Example Season\Episode.mkv", 123000);
+        var request = await CaptureRequest(new TranslateChatConfig(), source: source);
+        using var payload = JsonDocument.Parse(Convert.FromBase64String(request.LookupMetadata!));
+        var metadata = payload.RootElement;
+        Assert.Equal("", metadata.GetProperty("context").GetProperty("sentence").GetString());
+        var captured = metadata.GetProperty("source");
+        Assert.Equal("LLPlayer", captured.GetProperty("application").GetString());
+        Assert.Equal("Example Season", captured.GetProperty("category").GetString());
+        Assert.Equal("Episode.mkv", captured.GetProperty("media_title").GetString());
+        Assert.Equal(123000, captured.GetProperty("position_ms").GetInt64());
+        Assert.DoesNotContain("Private", payload.RootElement.ToString());
+        Assert.DoesNotContain("C:", payload.RootElement.ToString());
+    }
+
+    [Fact]
     public async Task SendsContextAndOnlyRequestsSelectedTextWithoutHistory()
     {
         var messages = await CaptureMessages(new TranslateChatConfig(), context: Context);
@@ -190,7 +207,8 @@ public class WordTranslationRequestTests
     }
 
     private static async Task<CapturedRequest> CaptureRequest(TranslateChatConfig config, bool wordMode = true,
-        WordTranslationContext? context = null, string term = "bank", bool hello = false)
+        WordTranslationContext? context = null, string term = "bank", bool hello = false,
+        WordTranslationSource? source = null)
     {
         using TcpListener listener = new(IPAddress.Loopback, 0);
         listener.Start();
@@ -203,8 +221,8 @@ public class WordTranslationRequestTests
         };
         using OpenAIBaseTranslateService service = new(settings, config, wordMode);
         service.Initialize(Language.English, TargetLanguage.ChineseSimplified);
-        var translating = hello ? OpenAIBaseTranslateService.Hello(settings) : context != null
-            ? service.TranslateWordAsync(term, context, timeout.Token)
+        var translating = hello ? OpenAIBaseTranslateService.Hello(settings) : context != null || source != null
+            ? service.TranslateWordAsync(term, context, timeout.Token, source)
             : service.TranslateAsync(term, timeout.Token);
         Assert.Equal("河岸", await translating);
         var captured = await receive;

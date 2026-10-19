@@ -140,7 +140,8 @@ public class OpenAIBaseTranslateService : ITranslateService
         return await SendChatRequest(_httpClient, _settings, messages, token);
     }
 
-    public Task<string> TranslateWordAsync(string text, WordTranslationContext? context, CancellationToken token)
+    public Task<string> TranslateWordAsync(string text, WordTranslationContext? context, CancellationToken token,
+        WordTranslationSource? source = null)
     {
         if (!_wordMode || _basePrompt == null)
             throw new InvalidOperationException("Word translation service must be initialized");
@@ -163,7 +164,13 @@ public class OpenAIBaseTranslateService : ITranslateService
                     following = context?.Following ?? []
                 },
                 looked_up_at = DateTimeOffset.UtcNow,
-                source = new { application = "LLPlayer" }
+                source = new
+                {
+                    application = "LLPlayer",
+                    category = source?.Category ?? "LLPlayer",
+                    media_title = source?.MediaTitle,
+                    position_ms = source?.PositionMs
+                }
             }, JsonOptions))
             : null;
         if (context == null)
