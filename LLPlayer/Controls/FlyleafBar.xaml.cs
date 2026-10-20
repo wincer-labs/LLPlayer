@@ -102,9 +102,8 @@ public partial class FlyleafBar : UserControl
                 MyCard.BeginAnimation(OpacityProperty, new DoubleAnimation()
                 {
                     BeginTime = TimeSpan.Zero,
-                    // A fully transparent layered window can lose native mouse hit testing.
-                    // Keep the hidden bar sensitive to MouseEnter in both display modes.
-                    To = 0.01,
+                    // Activity-driven mode wakes through the host even when fully transparent.
+                    To = FL.Config.SeekBarShowOnlyMouseOver ? 0.01 : 0,
                     Duration = new Duration(TimeSpan.FromMilliseconds(FL.Config.SeekBarFadeOutTimeMs))
                 });
             }
