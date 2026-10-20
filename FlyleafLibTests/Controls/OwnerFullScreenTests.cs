@@ -32,6 +32,7 @@ public class OwnerFullScreenTests
                 Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 RunScenario(false);
                 RunScenario(true);
+                MouseActivityScenarios.Run();
                 Playback.PlaybackIntegrationScenarios.Run();
             }
             catch (Exception error) { failure = error; }

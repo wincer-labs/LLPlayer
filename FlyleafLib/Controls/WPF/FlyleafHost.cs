@@ -788,6 +788,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             if (!_IsAttached || OwnerHandle == ownerHandle)
                 return; // Check OwnerHandle changed (NOTE: Owner can be the same class/window but the handle can be different)
 
+            Owner.RemoveHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(Owner_PreviewMouseMove));
             Owner.DpiChanged    -= Owner_DpiChanged;
             Owner.SizeChanged   -= Owner_SizeChanged;
 
@@ -800,6 +801,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             Surface.Title   = Owner.Title;
             Surface.Icon    = Owner.Icon;
 
+            Owner.AddHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(Owner_PreviewMouseMove), true);
             Owner.DpiChanged    += Owner_DpiChanged;
             Owner.SizeChanged   += Owner_SizeChanged;
 
@@ -819,6 +821,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         Surface.Title   = Owner.Title;
         Surface.Icon    = Owner.Icon;
 
+        Owner.AddHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(Owner_PreviewMouseMove), true);
         Owner.DpiChanged    += Owner_DpiChanged;
         Owner.SizeChanged   += Owner_SizeChanged;
         DataContextChanged  += Host_DataContextChanged;
@@ -1267,15 +1270,38 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             return;
     }
 
-    private void Surface_MouseMove(object sender, MouseEventArgs e)
+    private void Owner_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        _ = GetCursorPos(out var cur);
+        RefreshOwnerMouseActivity(e.GetPosition(this));
+    }
 
-        if (Player != null && cur != pMM)
+    private void RefreshOwnerMouseActivity(Point position)
+    {
+        // An empty transparent overlay can pass native mouse input to the owner.
+        // Limit that activity to the attached video area, excluding the sidebar.
+        if (!Disposed && _IsAttached && IsVisible && MouseBindings != AvailableWindows.None
+            && new Rect(RenderSize).Contains(position))
+            RefreshMouseActivity();
+    }
+
+    private void SO_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        // Child controls can handle bubbling MouseMove before it reaches the window.
+        RefreshMouseActivity();
+    }
+
+    private void RefreshMouseActivity()
+    {
+        if (GetCursorPos(out var cur) != 0 && Player != null && cur != pMM)
         {
             Player.Activity.RefreshFullActive();
             pMM = cur;
         }
+    }
+
+    private void Surface_MouseMove(object sender, MouseEventArgs e)
+    {
+        _ = GetCursorPos(out var cur);
 
         // Resize Sides (CanResize + !MouseDown + !FullScreen)
         if (e.MouseDevice.LeftButton != MouseButtonState.Pressed)
@@ -1295,12 +1321,6 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
     private void Overlay_MouseMove(object sender, MouseEventArgs e)
     {
         _ = GetCursorPos(out var cur);
-
-        if (Player != null && cur != pMM)
-        {
-            Player.Activity.RefreshFullActive();
-            pMM = cur;
-        }
 
         // Resize Sides (CanResize + !MouseDown + !FullScreen)
         if (e.MouseDevice.LeftButton != MouseButtonState.Pressed)
@@ -1773,7 +1793,8 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         if (Surface == null)
             return;
 
-        if ((MouseBindings == AvailableWindows.Surface || MouseBindings == AvailableWindows.Both) && !isMouseBindingsSubscribedSurface)
+        bool enabled = !Disposed && (MouseBindings == AvailableWindows.Surface || MouseBindings == AvailableWindows.Both);
+        if (enabled && !isMouseBindingsSubscribedSurface)
         {
             Surface.LostMouseCapture    += Surface_LostMouseCapture;
             Surface.MouseLeftButtonDown += Surface_MouseLeftButtonDown;
@@ -1783,6 +1804,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             {
                 Surface.MouseWheel += Surface_MouseWheel;
             }
+            Surface.AddHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(SO_PreviewMouseMove), true);
             Surface.MouseMove           += Surface_MouseMove;
             Surface.MouseLeave          += Surface_MouseLeave;
             if (ToggleFullScreenOnDoubleClick != AvailableWindows.None)
@@ -1791,7 +1813,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             }
             isMouseBindingsSubscribedSurface = true;
         }
-        else if (isMouseBindingsSubscribedSurface)
+        else if (!enabled && isMouseBindingsSubscribedSurface)
         {
             Surface.LostMouseCapture    -= Surface_LostMouseCapture;
             Surface.MouseLeftButtonDown -= Surface_MouseLeftButtonDown;
@@ -1801,6 +1823,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             {
                 Surface.MouseWheel -= Surface_MouseWheel;
             }
+            Surface.RemoveHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(SO_PreviewMouseMove));
             Surface.MouseMove           -= Surface_MouseMove;
             Surface.MouseLeave          -= Surface_MouseLeave;
             if (ToggleFullScreenOnDoubleClick != AvailableWindows.None)
@@ -1815,7 +1838,8 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         if (Overlay == null)
             return;
 
-        if ((MouseBindings == AvailableWindows.Overlay || MouseBindings == AvailableWindows.Both) && !isMouseBindingsSubscribedOverlay)
+        bool enabled = !Disposed && (MouseBindings == AvailableWindows.Overlay || MouseBindings == AvailableWindows.Both);
+        if (enabled && !isMouseBindingsSubscribedOverlay)
         {
             Overlay.LostMouseCapture    += Overlay_LostMouseCapture;
             Overlay.MouseLeftButtonDown += Overlay_MouseLeftButtonDown;
@@ -1825,6 +1849,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             {
                 Overlay.MouseWheel += Overlay_MouseWheel;
             }
+            Overlay.AddHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(SO_PreviewMouseMove), true);
             Overlay.MouseMove           += Overlay_MouseMove;
             Overlay.MouseLeave          += Overlay_MouseLeave;
             if (ToggleFullScreenOnDoubleClick != AvailableWindows.None)
@@ -1833,7 +1858,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             }
             isMouseBindingsSubscribedOverlay = true;
         }
-        else if (isMouseBindingsSubscribedOverlay)
+        else if (!enabled && isMouseBindingsSubscribedOverlay)
         {
             Overlay.LostMouseCapture    -= Overlay_LostMouseCapture;
             Overlay.MouseLeftButtonDown -= Overlay_MouseLeftButtonDown;
@@ -1843,6 +1868,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
             {
                 Overlay.MouseWheel -= Overlay_MouseWheel;
             }
+            Overlay.RemoveHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(SO_PreviewMouseMove));
             Overlay.MouseMove           -= Overlay_MouseMove;
             Overlay.MouseLeave          -= Overlay_MouseLeave;
             if (ToggleFullScreenOnDoubleClick != AvailableWindows.None)
@@ -2176,6 +2202,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
 
             if (Owner != null)
             {
+                Owner.RemoveHandler(Mouse.PreviewMouseMoveEvent, new MouseEventHandler(Owner_PreviewMouseMove));
                 Owner.DpiChanged  -= Owner_DpiChanged;
                 Owner.SizeChanged -= Owner_SizeChanged;
             }

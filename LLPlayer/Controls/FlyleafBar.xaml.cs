@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
@@ -102,8 +102,9 @@ public partial class FlyleafBar : UserControl
                 MyCard.BeginAnimation(OpacityProperty, new DoubleAnimation()
                 {
                     BeginTime = TimeSpan.Zero,
-                    // TODO: L: needs to be almost transparent to receive MouseEnter events
-                    To = FL.Config.SeekBarShowOnlyMouseOver ? 0.01 : 0,
+                    // A fully transparent layered window can lose native mouse hit testing.
+                    // Keep the hidden bar sensitive to MouseEnter in both display modes.
+                    To = 0.01,
                     Duration = new Duration(TimeSpan.FromMilliseconds(FL.Config.SeekBarFadeOutTimeMs))
                 });
             }
@@ -124,11 +125,8 @@ public partial class FlyleafBar : UserControl
 
     private void OnMouseEnter(object sender, MouseEventArgs e)
     {
-        if (FL.Config.SeekBarShowOnlyMouseOver && FL.Player.Activity.IsEnabled)
-        {
-            IsShowing = true;
-        }
-        else
+        IsShowing = true;
+        if (!FL.Config.SeekBarShowOnlyMouseOver || !FL.Player.Activity.IsEnabled)
         {
             SetActivity(false);
         }
